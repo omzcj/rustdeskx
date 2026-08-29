@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Verify arm64 package
+    runs-on: macos-14
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate scripts
+        run: bash -n Scripts/*.sh
+
+      - name: Build ad-hoc test package
+        env:
+          CODE_SIGN_IDENTITY: "-"
+        run: Scripts/package-release.sh
+
+      - name: Verify package
+        run: |
+          source Config/upstream.env
+          VERSION="${UPSTREAM_VERSION}.${RELEASE_REVISION}"
+          test -f "dist/RustDeskX-$VERSION-arm64.zip"
+          test "$(plutil -extract CFBundleIdentifier raw dist/RustDeskX.app/Contents/Info.plist)" = "com.omzcj.rustdeskx"
+          test "$(plutil -extract CFBundleExecutable raw dist/RustDeskX.app/Contents/Info.plist)" = "RustDeskX"
+          test "$(lipo -archs dist/RustDeskX.app/Contents/MacOS/RustDeskX)" = "arm64"
+          codesign --verify --deep --strict --verbose=2 dist/RustDeskX.app
+          (cd dist && shasum -a 256 -c "RustDeskX-$VERSION-arm64.zip.sha256")
