@@ -57,14 +57,14 @@ if [[ "$SIGN_IDENTITY" == "-" ]]; then
   TIMESTAMP_ARGS=(--timestamp=none)
 fi
 
-KEYCHAIN_ARGS=()
-if [[ -n "${CODE_SIGN_KEYCHAIN:-}" ]]; then
-  KEYCHAIN_ARGS=(--keychain "$CODE_SIGN_KEYCHAIN")
-fi
-
 sign_path() {
-  /usr/bin/codesign --force --sign "$SIGN_IDENTITY" --options runtime \
-    "${TIMESTAMP_ARGS[@]}" "${KEYCHAIN_ARGS[@]}" "$1"
+  if [[ -n "${CODE_SIGN_KEYCHAIN:-}" ]]; then
+    /usr/bin/codesign --force --sign "$SIGN_IDENTITY" --options runtime \
+      "${TIMESTAMP_ARGS[@]}" --keychain "$CODE_SIGN_KEYCHAIN" "$1"
+  else
+    /usr/bin/codesign --force --sign "$SIGN_IDENTITY" --options runtime \
+      "${TIMESTAMP_ARGS[@]}" "$1"
+  fi
 }
 
 info "Checking that every Mach-O binary is arm64-only"
