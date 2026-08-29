@@ -37,6 +37,8 @@ jobs:
           test -f "dist/RustDeskX-$VERSION-arm64.zip"
           test "$(plutil -extract CFBundleIdentifier raw dist/RustDeskX.app/Contents/Info.plist)" = "com.omzcj.rustdeskx"
           test "$(plutil -extract CFBundleExecutable raw dist/RustDeskX.app/Contents/Info.plist)" = "RustDeskX"
+          test "$(plutil -extract CFBundleShortVersionString raw dist/RustDeskX.app/Contents/Info.plist)" = "$UPSTREAM_VERSION"
+          test "$(plutil -extract CFBundleVersion raw dist/RustDeskX.app/Contents/Info.plist)" = "${UPSTREAM_BUILD_VERSION}.${RELEASE_REVISION}"
           test "$(lipo -archs dist/RustDeskX.app/Contents/MacOS/RustDeskX)" = "arm64"
           codesign --verify --deep --strict --verbose=2 dist/RustDeskX.app
           (cd dist && shasum -a 256 -c "RustDeskX-$VERSION-arm64.zip.sha256")
