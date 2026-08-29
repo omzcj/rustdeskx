@@ -15,95 +15,14 @@ concurrency:
 
 jobs:
   release:
-    name: Sign, notarize, and release/verify
-    runs-on: macos-14
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Validate release tag
-        run: |
-          source Config/upstream.env
-          VERSION="${UPSTREAM_VERSION}.${RELEASE_REVISION}"
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            EXPECTED="v${VERSION}"
-            if [[ "$GITHUB_REF_NAME" != "$EXPECTED" ]]; then
-              echo "Expected tag $EXPECTED, got $GITHUB_REF_NAME" >&2
-              exit 1
-            fi
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-
-      - name: Validate scripts
-        run: bash -n Scripts/*.sh
-
-      - name: Import Developer ID certificate
-        env:
-          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
-        run: |
-          test -n "$P12_BASE64"
-          test -n "$P12_PASSWORD"
-          KEYCHAIN_PATH="$RUNNER_TEMP/rustdeskx-signing.keychain-db"
-          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-          P12_PATH="$RUNNER_TEMP/rustdeskx-developer-id.p12"
-          printf '%s' "$P12_BASE64" | base64 -D > "$P12_PATH"
-          chmod 600 "$P12_PATH"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
-          security default-keychain -d user -s "$KEYCHAIN_PATH"
-          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk '/Developer ID Application/ {print $2; exit}')"
-          test -n "$IDENTITY"
-          echo "CODE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
-          echo "SIGNING_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-
-      - name: Prepare notarization key
-        env:
-          KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY_BASE64 }}
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-        run: |
-          test -n "$KEY_BASE64"
-          test -n "$KEY_ID"
-          KEY_PATH="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
-          printf '%s' "$KEY_BASE64" | base64 -D > "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "NOTARY_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-
-      - name: Package signed app
-        env:
-          CODE_SIGN_IDENTITY: ${{ env.CODE_SIGN_IDENTITY }}
-        run: Scripts/package-release.sh "$VERSION"
-
-      - name: Notarize and staple
-        env:
-          NOTARY_KEY_PATH: ${{ env.NOTARY_KEY_PATH }}
-          NOTARY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          NOTARY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-        run: Scripts/notarize-release.sh "$VERSION"
-
-      - name: Create GitHub release
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          source Config/upstream.env
-          gh release create "$GITHUB_REF_NAME" \
-            "dist/RustDeskX-$VERSION-arm64.zip" \
-            "dist/RustDeskX-$VERSION-arm64.zip.sha256" \
-            --verify-tag \
-            --title "RustDeskX $VERSION" \
-            --generate-notes \
-            --notes "Apple Silicon only. Signed with Developer ID and notarized by Apple. Built from the verified RustDesk $UPSTREAM_VERSION upstream arm64 package with RustDeskX bundle metadata."
-
-      - name: Remove signing credentials
-        if: always()
-        run: |
-          if [[ -n "${SIGNING_KEYCHAIN_PATH:-}" ]]; then
-            security delete-keychain "$SIGNING_KEYCHAIN_PATH" >/dev/null 2>&1 || true
-          fi
-          rm -f "$RUNNER_TEMP/rustdeskx-developer-id.p12" "$RUNNER_TEMP"/AuthKey_*.p8
+    uses: assassinor/apple-ci/.github/workflows/macos-developer-id.yml@5af044e806c9d6930eb5cea01721bbcb0fe1e365
+    with:
+      runner: macos-14
+      lane: release
+      publish: ${{ github.event_name == 'push' }}
+    secrets:
+      APPLE_ASC_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+      APPLE_ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+      APPLE_ASC_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_ASC_PRIVATE_KEY_BASE64 }}
+      APPLE_MATCH_PASSWORD: ${{ secrets.APPLE_MATCH_PASSWORD }}
+      APPLE_MATCH_GIT_PRIVATE_KEY: ${{ secrets.APPLE_MATCH_GIT_PRIVATE_KEY }}

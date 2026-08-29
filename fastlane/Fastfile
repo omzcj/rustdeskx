@@ -1,0 +1,48 @@
+require "shellwords"
+
+import_from_git(
+  url: "https://github.com/assassinor/apple-ci.git",
+  path: "fastlane/Fastfile",
+  branch: "v1.0.3"
+)
+
+default_platform(:mac)
+
+platform :mac do
+  desc "Build, sign, notarize, and optionally publish RustDeskX"
+  lane :release do
+    root = File.expand_path("..", __dir__)
+    escaped_root = Shellwords.escape(root)
+    config = File.readlines(File.join(root, "Config/upstream.env"), chomp: true).to_h do |line|
+      key, value = line.split("=", 2)
+      [key, value]
+    end
+    version = "#{config.fetch('UPSTREAM_VERSION')}.#{config.fetch('RELEASE_REVISION')}"
+    tag = "v#{version}"
+
+    if ENV["GITHUB_EVENT_NAME"] == "push" && ENV["GITHUB_REF_NAME"] != tag
+      UI.user_error!("Expected tag #{tag}, got #{ENV['GITHUB_REF_NAME']}")
+    end
+
+    escaped_version = Shellwords.escape(version)
+    escaped_tag = Shellwords.escape(tag)
+    notes = "Apple Silicon only. Signed with Developer ID and notarized by Apple. " \
+            "Built from the verified RustDesk #{config.fetch('UPSTREAM_VERSION')} upstream arm64 " \
+            "package with RustDeskX bundle metadata."
+
+    shared_macos_developer_id(
+      app_identifiers: ["com.omzcj.rustdeskx"],
+      validation_command: "cd #{escaped_root} && bash -n Scripts/*.sh",
+      package_command: "cd #{escaped_root} && Scripts/package-release.sh #{escaped_version}",
+      notarize_command: "cd #{escaped_root} && Scripts/notarize-release.sh #{escaped_version}",
+      release_command: <<~SHELL
+        cd #{escaped_root}
+        gh release create #{escaped_tag} \
+          dist/RustDeskX-#{escaped_version}-arm64.zip \
+          dist/RustDeskX-#{escaped_version}-arm64.zip.sha256 \
+          --verify-tag --title "RustDeskX #{version}" --generate-notes \
+          --notes #{Shellwords.escape(notes)}
+      SHELL
+    )
+  end
+end
