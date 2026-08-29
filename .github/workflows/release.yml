@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   release:
-    name: Sign, notarize, and release
+    name: Sign, notarize, and release/verify
     runs-on: macos-14
     timeout-minutes: 30
 
@@ -24,12 +25,15 @@ jobs:
       - name: Validate release tag
         run: |
           source Config/upstream.env
-          EXPECTED="v${UPSTREAM_VERSION}.${RELEASE_REVISION}"
-          if [[ "$GITHUB_REF_NAME" != "$EXPECTED" ]]; then
-            echo "Expected tag $EXPECTED, got $GITHUB_REF_NAME" >&2
-            exit 1
+          VERSION="${UPSTREAM_VERSION}.${RELEASE_REVISION}"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            EXPECTED="v${VERSION}"
+            if [[ "$GITHUB_REF_NAME" != "$EXPECTED" ]]; then
+              echo "Expected tag $EXPECTED, got $GITHUB_REF_NAME" >&2
+              exit 1
+            fi
           fi
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Validate scripts
         run: bash -n Scripts/*.sh
@@ -37,8 +41,10 @@ jobs:
       - name: Import Developer ID certificate
         env:
           P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
         run: |
           test -n "$P12_BASE64"
+          test -n "$P12_PASSWORD"
           KEYCHAIN_PATH="$RUNNER_TEMP/rustdeskx-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
           P12_PATH="$RUNNER_TEMP/rustdeskx-developer-id.p12"
@@ -47,7 +53,7 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P rustdeskx -T /usr/bin/codesign -T /usr/bin/security
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH"
           security default-keychain -d user -s "$KEYCHAIN_PATH"
@@ -81,6 +87,7 @@ jobs:
         run: Scripts/notarize-release.sh "$VERSION"
 
       - name: Create GitHub release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
