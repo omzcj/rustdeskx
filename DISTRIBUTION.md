@@ -8,7 +8,7 @@
 <RustDesk 上游版本>.<RustDeskX 修订号>
 ```
 
-例如 `1.4.9.1`，Git 标签为 `v1.4.9.1`。
+例如 `1.4.9.2`，Git 标签为 `v1.4.9.2`。
 
 ## Actions Secrets
 

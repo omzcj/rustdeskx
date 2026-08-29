@@ -40,9 +40,8 @@ brew install --cask rustdeskx
 CODE_SIGN_IDENTITY=- Scripts/package-release.sh
 ```
 
-正式发行由 `v1.4.9.1` 形式的标签触发 GitHub Actions，完成 Developer ID 签名、公证和 Release。
+正式发行由 `v1.4.9.2` 形式的标签触发 GitHub Actions，完成 Developer ID 签名、公证和 Release。
 
 ## 上游与许可
 
 RustDesk 由 RustDesk 项目维护，并依据 GPL-3.0 发布。本仓库保留上游版权与许可信息；详情见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。RustDeskX 与 RustDesk 官方项目没有隶属或背书关系。
-
