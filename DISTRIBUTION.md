@@ -23,7 +23,7 @@
 
 CI 通过只读 Fastlane Match 恢复 Developer ID 身份。不得把密码、P12、P8、私钥、
 provisioning profile 或解码文件提交到仓库、写入工作流或上传为普通 Artifact。
-凭证轮换和 Match 写入遵循 `assassinor/apple-ci` 的 credential runbook；普通发布不得
+凭证轮换和 Match 写入遵循 `oh-my-infra/apple-ci` 的 credential runbook；普通发布不得
 启用 Match 写入。
 
 ## 发布流程
@@ -33,4 +33,4 @@ provisioning profile 或解码文件提交到仓库、写入工作流或上传�
 3. 创建并推送与配置一致的签名标签，例如
    `git tag -s v1.4.9.3 -m "RustDeskX 1.4.9.3"`。
 4. Release 工作流下载并校验上游 DMG，重品牌、签名、公证和发布 ZIP。
-5. 用 Release ZIP 的 SHA-256 更新 `homebrew-omzcj/Casks/rustdeskx.rb`。
+5. 用 Release ZIP 的 SHA-256 更新 `oh-my-brew/homebrew-tap/Casks/rustdeskx.rb`。
