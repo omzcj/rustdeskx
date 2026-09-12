@@ -16,7 +16,7 @@ RustDeskX 是面向 Apple Silicon Mac 的 RustDesk 个人重品牌发行包：
 发布首版后可通过 Homebrew 安装：
 
 ```bash
-brew tap omzcj/omzcj
+brew tap oh-my-brew/tap
 brew install --cask rustdeskx
 ```
 
